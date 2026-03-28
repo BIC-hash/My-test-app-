@@ -1,0 +1,15 @@
+export const STORAGE_KEYS = {
+  authToken: 'auth_token',
+  refreshToken: 'refresh_token',
+  userId: 'user_id',
+  colorScheme: 'color_scheme',
+  accentColor: 'accent_color',
+  tasks: 'tasks',
+  projects: 'projects',
+  tags: 'tags',
+  pomodoroSettings: 'pomodoro_settings',
+  onboardingCompleted: 'onboarding_completed',
+  lastSyncAt: 'last_sync_at',
+  focusSessions: 'focus_sessions',
+  dailyStats: 'daily_stats',
+};
