@@ -1,35 +1,65 @@
-import { MMKV } from 'react-native-mmkv';
+/**
+ * AsyncStorage-backed storage adapter.
+ * Drop-in replacement for the MMKV implementation — same API, fully compatible with Expo Go.
+ */
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export const storage = new MMKV({ id: 'taskpro-storage' });
+// Synchronous in-memory cache so reads stay sync (like MMKV)
+const memCache: Record<string, string> = {};
+
+// Boot: hydrate cache from AsyncStorage on startup (fire-and-forget)
+AsyncStorage.getAllKeys()
+  .then(keys => AsyncStorage.multiGet(keys as string[]))
+  .then(pairs => pairs.forEach(([k, v]) => { if (v) memCache[k] = v; }))
+  .catch(() => {});
+
+function persist(key: string, value: string) {
+  AsyncStorage.setItem(key, value).catch(() => {});
+}
+
+export const storage = {
+  getString: (key: string) => memCache[key],
+  set: (key: string, value: string) => {
+    memCache[key] = value;
+    persist(key, value);
+  },
+  delete: (key: string) => {
+    delete memCache[key];
+    AsyncStorage.removeItem(key).catch(() => {});
+  },
+  clearAll: () => {
+    Object.keys(memCache).forEach(k => delete memCache[k]);
+    AsyncStorage.clear().catch(() => {});
+  },
+};
 
 export function storageGet<T>(key: string): T | undefined {
-  const raw = storage.getString(key);
+  const raw = memCache[key];
   if (!raw) return undefined;
-  try {
-    return JSON.parse(raw) as T;
-  } catch {
-    return undefined;
-  }
+  try { return JSON.parse(raw) as T; } catch { return undefined; }
 }
 
 export function storageSet<T>(key: string, value: T): void {
-  storage.set(key, JSON.stringify(value));
+  const s = JSON.stringify(value);
+  memCache[key] = s;
+  persist(key, s);
 }
 
 export function storageDelete(key: string): void {
-  storage.delete(key);
+  delete memCache[key];
+  AsyncStorage.removeItem(key).catch(() => {});
 }
 
 export function storageClear(): void {
-  storage.clearAll();
+  Object.keys(memCache).forEach(k => delete memCache[k]);
+  AsyncStorage.clear().catch(() => {});
 }
 
-// AsyncStorage-compatible wrapper for React Query persister
 export const mmkvStorageAdapter = {
   getItem: (key: string): Promise<string | null> =>
-    Promise.resolve(storage.getString(key) ?? null),
+    AsyncStorage.getItem(key),
   setItem: (key: string, value: string): Promise<void> =>
-    Promise.resolve(storage.set(key, value)),
+    AsyncStorage.setItem(key, value),
   removeItem: (key: string): Promise<void> =>
-    Promise.resolve(storage.delete(key)),
+    AsyncStorage.removeItem(key),
 };
